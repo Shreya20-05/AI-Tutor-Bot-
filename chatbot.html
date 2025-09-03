@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Tutor Bot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .message {
+            display: flex;
+            gap: 0.75rem;
+            max-width: 80%;
+        }
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+        .message .avatar {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .message.user .avatar {
+            background-color: #4f46e5;
+        }
+        .message.bot .avatar {
+            background-color: #10b981;
+        }
+        .message .avatar svg {
+            width: 1.5rem;
+            height: 1.5rem;
+            color: white;
+        }
+        .message .content {
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            word-break: break-word;
+        }
+        .message.user .content {
+            background-color: #4f46e5;
+            color: white;
+            border-top-right-radius: 0.25rem;
+        }
+        .message.bot .content {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            border-top-left-radius: 0.25rem;
+        }
+        .message.bot .content p { margin-bottom: 0.5rem; }
+        .message.bot .content ul, .message.bot .content ol { margin-left: 1.25rem; margin-bottom: 0.5rem; }
+        .message.bot .content li { margin-bottom: 0.25rem; }
+        .message.bot .content strong, .message.bot .content b { font-weight: 600; }
+        .message.bot .content code {
+            background-color: #e5e7eb;
+            padding: 0.125rem 0.25rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+        }
+        .message.bot .content pre {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            margin-bottom: 0.5rem;
+        }
+        .message.bot .content pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+
+        .loading-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .loading-indicator .dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            background-color: #6b7280;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-indicator .dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-indicator .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="h-screen w-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl h-full max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col">
+            <header class="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-800">AI Tutor Bot</h1>
+                        <p class="text-sm text-gray-500">Your friendly guide to learning</p>
+                    </div>
+                </div>
+            </header>
+
+            <div id="chat-messages" class="chat-messages">
+                <div class="message bot">
+                    <div class="avatar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                    </div>
+                    <div class="content">
+                        <p>Hello! I'm your AI Tutor. I can help you with a wide range of subjects. What would you like to learn about today?</p>
+                        <p>You can ask me things like:</p>
+                        <ul>
+                            <li>"Explain the theory of relativity."</li>
+                            <li>"What is the Pythagorean theorem?"</li>
+                            <li>"Help me understand photosynthesis."</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="p-4 border-t border-gray-200 flex-shrink-0">
+                <form id="chat-form" class="flex items-center gap-3">
+                    <input type="text" id="message-input" placeholder="Ask me anything..." class="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition flex items-center gap-2 disabled:bg-indigo-300 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                        <span>Send</span>
+                    </button>
+                </form>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const chatMessages = document.getElementById('chat-messages');
+        const sendButton = chatForm.querySelector('button[type="submit"]');
+
+        const userApiKey = 'AIzaSyAEdVGO78M0s14d-yvklQlqjiWFWgPcUW0';
+
+        const systemPrompt = `You are 'TutorBot', a friendly and knowledgeable AI tutor. Your primary goal is to help users understand complex topics by providing clear, patient, and encouraging explanations.
+- **Tone:** Be supportive, engaging, and positive. Avoid being overly technical unless necessary.
+- **Method:** Break down complex concepts into simple, easy-to-digest steps. Use examples, real-world analogies, and stories to make learning memorable.
+- **Interaction:** After explaining a concept, encourage the user to ask follow-up questions or test their understanding with a related problem. For example, "Does that make sense?" or "Would you like to try solving a similar problem?".
+- **Formatting:** Use markdown for formatting to improve readability. Use bold for **key terms**, create lists for steps or important points, and use code blocks for code examples or mathematical formulas.
+- **Safety:** Do not provide answers to tests, engage in harmful or unethical topics, or provide personal advice. If a request is inappropriate, politely decline and steer the conversation back to a learning topic.`;
+        
+        let conversationHistory = [
+            {
+                role: "user",
+                parts: [{ text: "Initial hidden prompt to set up the context." }]
+            },
+            {
+                role: "model",
+                parts: [{ text: "Understood. I am TutorBot, ready to help students learn with clear and encouraging explanations." }]
+            }
+        ];
+
+        chatForm.addEventListener('submit', handleFormSubmit);
+        
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            const userMessage = messageInput.value.trim();
+            if (!userMessage) return;
+
+            addMessage(userMessage, 'user');
+            conversationHistory.push({ role: "user", parts: [{ text: userMessage }] });
+            messageInput.value = '';
+            
+            showLoadingIndicator();
+            await getTutorResponse();
+        }
+
+        function addMessage(text, sender) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', sender);
+
+            const avatarSVG = sender === 'user' 
+                ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`
+                : `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>`;
+
+            const contentHTML = sender === 'bot' ? marked.parse(text) : text;
+
+            messageElement.innerHTML = `
+                <div class="avatar">${avatarSVG}</div>
+                <div class="content">${contentHTML}</div>
+            `;
+            chatMessages.appendChild(messageElement);
+            scrollToBottom();
+        }
+
+        function showLoadingIndicator() {
+            const loadingElement = document.createElement('div');
+            loadingElement.classList.add('message', 'bot', 'loading');
+            loadingElement.innerHTML = `
+                <div class="avatar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                </div>
+                <div class="content loading-indicator">
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                </div>
+            `;
+            chatMessages.appendChild(loadingElement);
+            scrollToBottom();
+            sendButton.disabled = true;
+            messageInput.disabled = true;
+        }
+
+        function removeLoadingIndicator() {
+            const loadingElement = chatMessages.querySelector('.loading');
+            if (loadingElement) {
+                loadingElement.remove();
+            }
+            sendButton.disabled = false;
+            messageInput.disabled = false;
+            messageInput.focus();
+        }
+
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function getTutorResponse() {
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${userApiKey}`;
+            const payload = {
+                contents: conversationHistory,
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+            
+            let responseText = "";
+            let retries = 3;
+            let delay = 1000;
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 403) {
+                             responseText = "It seems your API key is invalid or has insufficient permissions. Please check your key and try again.";
+                        } else {
+                            throw new Error(`API request failed with status ${response.status}`);
+                        }
+                        break;
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates.length > 0 && result.candidates[0].content?.parts?.[0]?.text) {
+                        responseText = result.candidates[0].content.parts[0].text;
+                        conversationHistory.push({ role: "model", parts: [{ text: responseText }] });
+                        break; 
+                    } else {
+                        responseText = "I received a response, but it was empty. This might be due to the safety settings for your query. Could you please try rephrasing?";
+                        break;
+                    }
+                } catch (error) {
+                    console.error("API call failed:", error);
+                    if (i === retries - 1) {
+                        responseText = "I'm having trouble connecting right now. Please try again in a moment.";
+                    }
+                    await new Promise(res => setTimeout(res, delay));
+                    delay *= 2;
+                }
+            }
+
+            removeLoadingIndicator();
+            addMessage(responseText, 'bot');
+        }
+    </script>
+</body>
+</html>
+
+ 
